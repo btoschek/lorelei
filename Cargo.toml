@@ -1,0 +1,31 @@
+[package]
+name = "lorelei"
+version = "0.1.0"
+authors = ["Bastian Toschek <bastian.toschek@protonmail.com>"]
+edition = "2021"
+
+[dependencies]
+tracing = "0.1"
+tracing-subscriber = "0.2"
+tracing-futures = "0.2"
+dotenv = "0.15.0"
+
+# Async functionality
+[dependencies.tokio]
+version = "1"
+features = ["full"]
+
+# Discord API wrapper
+[dependencies.serenity]
+version = "0.10"
+features = [
+  "client",
+  "cache",
+  "standard_framework",
+  "voice",
+  "rustls_backend",
+]
+
+[dependencies.songbird]
+version = "0.2"
+features = [ "builtin-queue" ]
