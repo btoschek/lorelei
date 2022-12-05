@@ -1,3 +1,9 @@
+pub mod command_ping;
+
+pub mod command {
+    pub use super::command_ping as ping;
+}
+
 use std::collections::HashSet;
 use serenity::{
     framework::standard::{

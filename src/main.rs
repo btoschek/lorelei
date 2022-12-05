@@ -5,7 +5,7 @@ use dotenv::dotenv;
 use songbird::SerenityInit;
 use serenity::{
     client::Client,
-    framework::StandardFramework,
+    framework::StandardFramework, prelude::GatewayIntents,
 };
 use std::env;
 use tracing::{event, Level};
@@ -36,7 +36,13 @@ async fn main() {
         .group(&MUSIC_GROUP);
 
     event!(Level::INFO, "Starting up.");
-    let mut client = Client::builder(&token)
+
+    let intents = GatewayIntents::non_privileged()
+        | GatewayIntents::GUILD_MESSAGES
+        | GatewayIntents::DIRECT_MESSAGES
+        | GatewayIntents::MESSAGE_CONTENT;
+
+    let mut client = Client::builder(&token, intents)
         .event_handler(BotHandler)
         .framework(framework)
         .register_songbird()

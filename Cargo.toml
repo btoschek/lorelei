@@ -17,7 +17,7 @@ features = ["full"]
 
 # Discord API wrapper
 [dependencies.serenity]
-version = "0.10"
+version = "0.11"
 features = [
   "client",
   "cache",
@@ -27,5 +27,5 @@ features = [
 ]
 
 [dependencies.songbird]
-version = "0.2"
+version = "0.3"
 features = [ "builtin-queue" ]
