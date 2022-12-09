@@ -9,12 +9,6 @@ use serenity::{
 };
 use std::env;
 use tracing::{event, Level};
-
-use modules::{
-    general::*,
-    music::*,
-};
-
 use handler::BotHandler;
 
 #[tokio::main]
@@ -31,9 +25,7 @@ async fn main() {
     // Configure the client with your Discord bot token in the environment.
     let token = env::var("BOT_TOKEN").expect("Missing TOKEN");
     let framework = StandardFramework::new()
-        .configure(|c| c.prefix("!"))
-        .help(&HELP)
-        .group(&MUSIC_GROUP);
+        .configure(|c| c.prefix("!"));
 
     event!(Level::INFO, "Starting up.");
 
