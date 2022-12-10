@@ -3,18 +3,22 @@ use serenity::{
     client::{Context, EventHandler},
     model::{
         application::interaction::Interaction,
-        gateway::Ready,
+        gateway::Ready, voice::VoiceState,
     }
 };
 use tracing::{event, Level};
-use crate::modules::general;
-use crate::modules::music;
+use crate::modules::{
+    auto,
+    general,
+    music,
+};
 
 pub struct BotHandler;
 
 #[async_trait]
 impl EventHandler for BotHandler {
 
+    /// Handle any slash command interactions with a user
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::ApplicationCommand(command) = interaction {
 
@@ -39,6 +43,7 @@ impl EventHandler for BotHandler {
         };
     }
 
+    /// Signal to Discord the commands our bot exposes
     async fn ready(&self, ctx: Context, ready: Ready) {
 
         event!(Level::INFO, "Connected as {}#{}",
@@ -47,5 +52,10 @@ impl EventHandler for BotHandler {
 
         general::register_commands(&ctx).await;
         music::register_commands(&ctx).await;
+    }
+
+    /// Trigger automated voice-chat related functionalities
+    async fn voice_state_update(&self, ctx: Context, old: Option<VoiceState>, new: VoiceState) {
+        auto::dynamic_voice_channels::run(&ctx, &old, &new).await;
     }
 }
