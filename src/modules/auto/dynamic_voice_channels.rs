@@ -64,6 +64,8 @@ pub async fn on_voice_channel_leave(ctx: &Context, state: &VoiceState) {
         return;
     }
 
+    // TODO: Check if bot is only member in voice
+
     let _ = channel
         .delete(&ctx.http)
         .await;

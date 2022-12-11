@@ -28,4 +28,4 @@ features = [
 
 [dependencies.songbird]
 version = "0.3"
-features = [ "builtin-queue" ]
+features = [ "builtin-queue", "yt-dlp" ]
