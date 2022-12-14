@@ -1,27 +1,18 @@
+use crate::modules::{auto, general, music};
 use serenity::{
     async_trait,
     client::{Context, EventHandler},
-    model::{
-        application::interaction::Interaction,
-        gateway::Ready, voice::VoiceState,
-    }
+    model::{application::interaction::Interaction, gateway::Ready, voice::VoiceState},
 };
 use tracing::{event, Level};
-use crate::modules::{
-    auto,
-    general,
-    music,
-};
 
 pub struct BotHandler;
 
 #[async_trait]
 impl EventHandler for BotHandler {
-
     /// Handle any slash command interactions with a user
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::ApplicationCommand(command) = interaction {
-
             let content = match command.data.name.as_str() {
                 "ping" => general::command::ping::run(&ctx, &command).await,
                 "join" => music::command::join::run(&ctx, &command).await,
@@ -45,10 +36,12 @@ impl EventHandler for BotHandler {
 
     /// Signal to Discord the commands our bot exposes
     async fn ready(&self, ctx: Context, ready: Ready) {
-
-        event!(Level::INFO, "Connected as {}#{}",
-              ready.user.name,
-              ready.user.discriminator);
+        event!(
+            Level::INFO,
+            "Connected as {}#{}",
+            ready.user.name,
+            ready.user.discriminator
+        );
 
         general::register_commands(&ctx).await;
         music::register_commands(&ctx).await;

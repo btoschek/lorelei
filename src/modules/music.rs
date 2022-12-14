@@ -1,5 +1,4 @@
-use serenity::client::Context;
-use serenity::model::application::command::Command;
+use serenity::{client::Context, model::application::command::Command};
 
 pub mod command_join;
 pub mod command_leave;
@@ -15,13 +14,16 @@ pub mod command {
 pub async fn register_commands(ctx: &Context) {
     Command::create_global_application_command(&ctx.http, |command| {
         self::command::join::register(command)
-    }).await;
+    })
+    .await;
 
     Command::create_global_application_command(&ctx.http, |command| {
         self::command::leave::register(command)
-    }).await;
+    })
+    .await;
 
     Command::create_global_application_command(&ctx.http, |command| {
         self::command::play::register(command)
-    }).await;
+    })
+    .await;
 }

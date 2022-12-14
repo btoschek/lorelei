@@ -1,27 +1,27 @@
-use serenity::client::Context;
-use serenity::model::voice::VoiceState;
-use serenity::model::channel::ChannelType;
+use serenity::{
+    client::Context,
+    model::{channel::ChannelType, voice::VoiceState},
+};
 
 /// Create a new voice channel when a user joins a specific voice channel.
 /// Afterwards, move the user to the newly created channel.
 pub async fn on_voice_channel_join(ctx: &Context, state: &VoiceState) {
-
-    let guild = ctx.cache
+    let guild = ctx
+        .cache
         .guild(state.guild_id.expect("Voice channels are all in guilds"))
         .unwrap();
 
-    let channel_id = state.channel_id.expect("VoiceState required when user in voice");
-    let channel = ctx.cache
-        .guild_channel(channel_id)
-        .unwrap();
+    let channel_id = state
+        .channel_id
+        .expect("VoiceState required when user in voice");
+    let channel = ctx.cache.guild_channel(channel_id).unwrap();
 
-    let category_id = channel.parent_id.expect("All channels by design have one category they're in");
-    let category = ctx.cache
-        .category(category_id)
-        .unwrap();
+    let category_id = channel
+        .parent_id
+        .expect("All channels by design have one category they're in");
+    let category = ctx.cache.category(category_id).unwrap();
 
     if channel.name().starts_with('➕') {
-
         let mut name = category.name().to_string();
         let name = name.remove(0).to_uppercase().to_string() + &name;
 
@@ -32,16 +32,16 @@ pub async fn on_voice_channel_join(ctx: &Context, state: &VoiceState) {
                     .name(format!("🤖 {}", name))
                     .kind(ChannelType::Voice)
                     .category(category_id)
-                    //.user_limit(channel.user_limit)
-            }).await;
+                //.user_limit(channel.user_limit)
+            })
+            .await;
 
         // TODO: Check if channel was created
 
         // Move user to the new channel
-        let _ = guild.move_member(&ctx.http,
-            state.user_id,
-            new_id.unwrap()
-        ).await;
+        let _ = guild
+            .move_member(&ctx.http, state.user_id, new_id.unwrap())
+            .await;
 
         // TODO: Allow channel creator to change things as max member count
     }
@@ -49,11 +49,10 @@ pub async fn on_voice_channel_join(ctx: &Context, state: &VoiceState) {
 
 /// Cleanup unused voice channels previously created on-demand
 pub async fn on_voice_channel_leave(ctx: &Context, state: &VoiceState) {
-
-    let channel_id = state.channel_id.expect("Old VoiceState required when user leaves voice");
-    let channel = ctx.cache
-        .guild_channel(channel_id)
-        .unwrap();
+    let channel_id = state
+        .channel_id
+        .expect("Old VoiceState required when user leaves voice");
+    let channel = ctx.cache.guild_channel(channel_id).unwrap();
 
     let member_count = match channel.members(&ctx.cache).await {
         Ok(v) => v.len(),
@@ -66,13 +65,10 @@ pub async fn on_voice_channel_leave(ctx: &Context, state: &VoiceState) {
 
     // TODO: Check if bot is only member in voice
 
-    let _ = channel
-        .delete(&ctx.http)
-        .await;
+    let _ = channel.delete(&ctx.http).await;
 }
 
 pub async fn run(ctx: &Context, old: &Option<VoiceState>, new: &VoiceState) {
-
     // User left voice chat
     if new.channel_id.is_none() {
         on_voice_channel_leave(ctx, old.as_ref().unwrap()).await;

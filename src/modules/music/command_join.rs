@@ -1,15 +1,16 @@
-use serenity::client::Context;
-use serenity::builder::CreateApplicationCommand;
-use serenity::model::application::interaction::application_command::ApplicationCommandInteraction;
+use serenity::{
+    builder::CreateApplicationCommand, client::Context,
+    model::application::interaction::application_command::ApplicationCommandInteraction,
+};
 
 pub async fn run(ctx: &Context, interaction: &ApplicationCommandInteraction) -> String {
-
     let guild_id = interaction.guild_id.unwrap();
     let guild = ctx.cache.guild(guild_id).unwrap();
     let user_id = interaction.user.id;
 
     let channel_id = guild
-        .voice_states.get(&user_id)
+        .voice_states
+        .get(&user_id)
         .and_then(|voice_state| voice_state.channel_id);
 
     let connect_to = match channel_id {
@@ -20,8 +21,10 @@ pub async fn run(ctx: &Context, interaction: &ApplicationCommandInteraction) -> 
         }
     };
 
-    let manager = songbird::get(ctx).await
-        .expect("Songbird Voice client placed in at initialisation.").clone();
+    let manager = songbird::get(ctx)
+        .await
+        .expect("Songbird Voice client placed in at initialisation.")
+        .clone();
 
     let _handler = manager.join(guild_id, connect_to).await;
 
@@ -29,7 +32,5 @@ pub async fn run(ctx: &Context, interaction: &ApplicationCommandInteraction) -> 
 }
 
 pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
-    command
-        .name("join")
-        .description("Join your voice channel")
+    command.name("join").description("Join your voice channel")
 }

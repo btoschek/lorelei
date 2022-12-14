@@ -1,5 +1,4 @@
-use serenity::client::Context;
-use serenity::model::application::command::Command;
+use serenity::{client::Context, model::application::command::Command};
 
 pub mod command_ping;
 
@@ -11,5 +10,6 @@ pub mod command {
 pub async fn register_commands(ctx: &Context) {
     Command::create_global_application_command(&ctx.http, |command| {
         self::command::ping::register(command)
-    }).await;
+    })
+    .await;
 }

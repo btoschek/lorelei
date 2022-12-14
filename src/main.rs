@@ -1,19 +1,15 @@
-mod modules;
 mod handler;
+mod modules;
 
 use dotenv::dotenv;
+use handler::BotHandler;
+use serenity::{client::Client, framework::StandardFramework, prelude::GatewayIntents};
 use songbird::SerenityInit;
-use serenity::{
-    client::Client,
-    framework::StandardFramework, prelude::GatewayIntents,
-};
 use std::env;
 use tracing::{event, Level};
-use handler::BotHandler;
 
 #[tokio::main]
 async fn main() {
-
     // Load environment variables from .env file
     dotenv().ok();
 
@@ -24,8 +20,7 @@ async fn main() {
 
     // Configure the client with your Discord bot token in the environment.
     let token = env::var("BOT_TOKEN").expect("Missing TOKEN");
-    let framework = StandardFramework::new()
-        .configure(|c| c.prefix("!"));
+    let framework = StandardFramework::new().configure(|c| c.prefix("!"));
 
     event!(Level::INFO, "Starting up.");
 
@@ -42,11 +37,15 @@ async fn main() {
         .expect("Error creating client");
 
     tokio::spawn(async move {
-        let _ = client.start().await.map_err(|why| event!(Level::ERROR, "Client ended: {:?}", why));
+        let _ = client
+            .start()
+            .await
+            .map_err(|why| event!(Level::ERROR, "Client ended: {:?}", why));
     });
 
     // Wait for SIGINT to stop the bot
-    #[allow(unused_must_use)] {
+    #[allow(unused_must_use)]
+    {
         tokio::signal::ctrl_c().await;
         event!(Level::INFO, "Received Ctrl-C, shutting down.");
     }
