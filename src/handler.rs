@@ -18,6 +18,7 @@ impl EventHandler for BotHandler {
                 "join" => music::command::join::run(&ctx, &command).await,
                 "leave" => music::command::leave::run(&ctx, &command).await,
                 "play" => music::command::play::run(&ctx, &command).await,
+                "skip" => music::command::skip::run(&ctx, &command).await,
                 _ => "not implemented!".to_string(),
             };
 
