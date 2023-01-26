@@ -16,7 +16,7 @@ impl EventHandler for BotHandler {
             let _ = match command.data.name.as_str() {
                 // "ping" => general::command::ping::run(&ctx, &command).await,
                 "join" => music::command::join::run(&ctx, &command, true).await,
-                // "leave" => music::command::leave::run(&ctx, &command).await,
+                "leave" => music::command::leave::run(&ctx, &command, true).await,
                 "play" => music::command::play::run(&ctx, &command, true).await,
                 // "skip" => music::command::skip::run(&ctx, &command).await,
                 _ => unreachable!("No further commands implemented"),
