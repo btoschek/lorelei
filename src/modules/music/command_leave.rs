@@ -35,4 +35,5 @@ pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicatio
     command
         .name("leave")
         .description("Leave current voice channel")
+        .description_localized("de", "Lass mich den aktuellen Sprachkanal verlassen")
 }

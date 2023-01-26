@@ -41,7 +41,7 @@ pub async fn run(
     if react {
         interaction_response!(interaction, ctx, |d| {
             d.content(format!(
-                "Connected to voice channel {}",
+                "Connected to {}",
                 ctx.cache
                     .channel(channel_id)
                     .expect("User channel has to exist")
@@ -54,5 +54,8 @@ pub async fn run(
 }
 
 pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
-    command.name("join").description("Join your voice channel")
+    command
+        .name("join")
+        .description("Let me join your voice channel")
+        .description_localized("de", "Lass mich deinem Sprachkanal beitreten")
 }

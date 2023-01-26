@@ -110,10 +110,12 @@ pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicatio
     command
         .name("play")
         .description("Play an audio stream from different sources")
+        .description_localized("de", "Lasse mich einen bestimmten Audio Track spielen")
         .create_option(|option| {
             option
                 .name("url")
                 .description("The URL directing to your audio source")
+                .description_localized("de", "Die URL zu deinem Audio Track")
                 .kind(CommandOptionType::String)
                 .required(true)
         })
