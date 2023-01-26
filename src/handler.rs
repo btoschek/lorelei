@@ -13,25 +13,14 @@ impl EventHandler for BotHandler {
     /// Handle any slash command interactions with a user
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::ApplicationCommand(command) = interaction {
-            let content = match command.data.name.as_str() {
-                "ping" => general::command::ping::run(&ctx, &command).await,
-                "join" => music::command::join::run(&ctx, &command).await,
-                "leave" => music::command::leave::run(&ctx, &command).await,
-                "play" => music::command::play::run(&ctx, &command).await,
-                "skip" => music::command::skip::run(&ctx, &command).await,
-                _ => "not implemented!".to_string(),
+            let _ = match command.data.name.as_str() {
+                // "ping" => general::command::ping::run(&ctx, &command).await,
+                "join" => music::command::join::run(&ctx, &command, true).await,
+                // "leave" => music::command::leave::run(&ctx, &command).await,
+                "play" => music::command::play::run(&ctx, &command, true).await,
+                // "skip" => music::command::skip::run(&ctx, &command).await,
+                _ => unreachable!("No further commands implemented"),
             };
-
-            if let Err(_why) = command
-                .create_interaction_response(&ctx.http, |response| {
-                    response
-                        .kind(serenity::model::prelude::interaction::InteractionResponseType::ChannelMessageWithSource)
-                        .interaction_response_data(|message| message.content(content))
-                })
-                .await
-            {
-                todo!("Implement");
-            }
         };
     }
 
