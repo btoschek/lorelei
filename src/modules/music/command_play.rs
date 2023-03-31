@@ -1,5 +1,7 @@
-use crate::interaction_response;
+use super::super::util::EmbedColor;
+use crate::{edit_interaction_response, interaction_response};
 
+use chrono::{NaiveDate, NaiveTime};
 use serenity::{
     builder::CreateApplicationCommand,
     client::Context,
@@ -10,7 +12,6 @@ use serenity::{
             command::CommandOptionType, interaction::application_command::CommandDataOptionValue,
         },
     },
-    utils::Color,
 };
 
 use songbird::input::restartable::Restartable;
@@ -30,17 +31,19 @@ pub async fn run(
         .expect("Expected URL string")
         .resolved
         .as_ref()
-        .expect("");
+        .expect("Valid UTF-8 String expected");
 
     let url = match url {
         CommandDataOptionValue::String(u) => u,
-        _ => unreachable!("non-string value in string parameter"),
+        _ => unreachable!("Non-string value in string parameter"),
     };
 
     if !url.starts_with("http") {
-        // log_msg_err(msg.channel_id.say(&ctx.http, "Must provide a valid URL").await);
         return Ok(interaction_response!(interaction, ctx, |d| {
-            d.content("Invalid URL parameter")
+            d.ephemeral(true).embed(|e| {
+                e.title("Invalid URL parameter")
+                    .color(EmbedColor::Failure.hex())
+            })
         }));
     }
 
@@ -53,15 +56,23 @@ pub async fn run(
     if let Some(handler_lock) = manager.get(guild_id) {
         let mut handler = handler_lock.lock().await;
 
+        interaction_response!(interaction, ctx, |d| {
+            d.ephemeral(true).embed(|e| {
+                e.title("Searching ...")
+                    .url(url)
+                    .color(EmbedColor::Pending.hex())
+            })
+        });
+
         // Use lazy restartable sources to not pay
         // for decoding of tracks which aren't actually live yet
         let source = match Restartable::ytdl(url.clone(), true).await {
             Ok(source) => source,
             Err(_why) => {
-                // log_msg_err(msg.channel_id.say(&ctx.http, format!("{:?}", why)).await);
-                return Ok(interaction_response!(interaction, ctx, |d| {
-                    d.content("Wasn't able to get audio source")
-                }));
+                edit_interaction_response!(interaction, ctx, |d| {
+                    d.embed(|e| e.title("Source not found").color(EmbedColor::Failure.hex()))
+                });
+                return Ok(());
             }
         };
 
@@ -69,16 +80,15 @@ pub async fn run(
 
         let meta = track_handle.metadata();
 
-        //log_msg_err(msg.channel_id.say(&ctx.http, "Playing song").await);
         if react {
-            interaction_response!(interaction, ctx, |d| {
+            edit_interaction_response!(interaction, ctx, |d| {
                 d.embed(|e| {
-                    e.title(&meta.title.as_ref().unwrap_or(&"No title".to_string()))
-                        .url(&meta.source_url.as_ref().unwrap())
-                        .color(Color::new(0xb4f050))
+                    e.title(meta.title.as_ref().unwrap_or(&"No title".to_string()))
+                        .url(meta.source_url.as_ref().unwrap())
+                        .color(EmbedColor::Success.hex())
                         .thumbnail(
-                            &meta.thumbnail.as_ref().unwrap_or(
-                                &"https://images6.alphacoders.com/766/thumb-1920-766470.png"
+                            meta.thumbnail.as_ref().unwrap_or(
+                                &"https://ak.picdn.net/shutterstock/videos/34370329/thumb/1.jpg"
                                     .to_string(),
                             ),
                         );
@@ -88,16 +98,22 @@ pub async fn run(
                     }
 
                     if let Some(duration) = &meta.duration.as_ref() {
-                        let _ = duration.as_secs();
+                        let time = NaiveTime::from_num_seconds_from_midnight_opt(
+                            duration.as_secs() as u32,
+                            0,
+                        )
+                        .expect("Just crash if someone is trolling with lengths exceeding the heat death of the universe");
+                        e.field("Duration", time.format("%H:%M:%S"), true);
                     }
 
                     if let Some(date) = &meta.date.as_ref() {
-                        let _ = date;
+                        let datetime = NaiveDate::parse_from_str(date, "%Y%m%d").expect("This format theoretically should not change");
+                        e.field("Uploaded", datetime.format("%d.%m.%Y"), true);
                     }
 
                     e
                 })
-            })
+            });
         }
     } else {
         //log_msg_err(msg.channel_id.say(&ctx.http, "Not in a voice channel to play in").await);
