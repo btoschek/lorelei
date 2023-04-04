@@ -1,7 +1,7 @@
 [package]
 name = "lorelei"
 version = "0.1.0"
-authors = ["Bastian Toschek <bastian.toschek@protonmail.com>"]
+authors = ["btoschek <btoschek@protonmail.com>"]
 edition = "2021"
 
 [dependencies]
