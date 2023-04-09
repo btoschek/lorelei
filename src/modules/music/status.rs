@@ -56,3 +56,33 @@ pub async fn ensure_channel_exists(ctx: &Context) {
             .await;
     }
 }
+
+/// Get a handle to the channel displaying bot state
+async fn get_status_channel(ctx: &Context) -> Option<ChannelId> {
+    let guild_id = GuildId(env::var("TEST_GUILD").unwrap().parse().unwrap());
+    let guild = ctx.cache.guild(guild_id)?;
+
+    for (id, _) in guild.channels {
+        if id.name(ctx).await == Some(CHANNEL_NAME.to_string()) {
+            return Some(id);
+        }
+    }
+
+    None
+}
+
+/// Get a handle to the message used to convey bot information
+pub async fn get_status_message(ctx: &Context) -> Option<Message> {
+    let channel = get_status_channel(ctx).await?;
+
+    let messages = channel
+        .messages(&ctx.http, |retriever| retriever.limit(1))
+        .await
+        .ok()?;
+
+    if messages.is_empty() {
+        None
+    } else {
+        Some(messages.get(0).unwrap().to_owned())
+    }
+}
