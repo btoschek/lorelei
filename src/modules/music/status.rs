@@ -1,11 +1,16 @@
+use chrono::{NaiveDate, NaiveTime};
 use serenity::{
     client::Context,
     model::{
         id::GuildId,
-        prelude::{ChannelType, PermissionOverwrite, PermissionOverwriteType, RoleId},
+        prelude::{
+            component::ButtonStyle, ChannelId, ChannelType, Message, PermissionOverwrite,
+            PermissionOverwriteType, ReactionType, RoleId, UserId,
+        },
         Permissions,
     },
 };
+use songbird::tracks::TrackQueue;
 use std::env;
 
 use crate::modules::util::EmbedColor;
@@ -85,4 +90,115 @@ pub async fn get_status_message(ctx: &Context) -> Option<Message> {
     } else {
         Some(messages.get(0).unwrap().to_owned())
     }
+}
+
+/// Set the status message to display information about the current track
+pub async fn set_currently_playing(ctx: &Context, queue: &TrackQueue, user_id: UserId) {
+    let mut message = get_status_message(ctx).await.unwrap();
+
+    let user = user_id.to_user(&ctx).await.expect("User has to exist");
+    let current_track = queue.current();
+
+    let current_track = match current_track {
+        Some(track) => track,
+        None => return,
+    };
+
+    let meta = current_track.metadata();
+
+    let _ = message
+        .edit(&ctx.http, |m| {
+            m.embed(|e| {
+                e.title("Listening to")
+                    .description(format!(
+                        "[{}]({})",
+                        meta.title.as_ref().unwrap_or(&"Untitled".to_string()),
+                        meta.source_url.as_ref().unwrap_or(&"Test".to_string())
+                    ))
+                    .color(EmbedColor::Success.hex())
+                    .thumbnail(
+                        meta.thumbnail.as_ref().unwrap_or(
+                            &"https://ak.picdn.net/shutterstock/videos/34370329/thumb/1.jpg"
+                                .to_string(),
+                        ),
+                    );
+
+                if let Some(artist) = &meta.artist.as_ref() {
+                    e.footer(|f| f.text(artist));
+                }
+
+                if let Some(duration) = &meta.duration.as_ref() {
+                    let time = NaiveTime::from_num_seconds_from_midnight_opt(
+                        duration.as_secs() as u32,
+                        0,
+                    )
+                    .expect("Just crash if someone is trolling with lengths exceeding the heat death of the universe");
+                    e.field("Duration", time.format("%H:%M:%S"), true);
+                }
+
+                if let Some(date) = &meta.date.as_ref() {
+                    let datetime = NaiveDate::parse_from_str(date, "%Y%m%d")
+                        .expect("This format theoretically should not change");
+                    e.field("Uploaded", datetime.format("%d.%m.%Y"), true);
+                }
+
+                e.field(
+                    "Queued by",
+                    format!("{}#{}", user.name, user.discriminator),
+                    true,
+                );
+
+                if queue.len() > 1 {
+                    e.field("Pending songs", queue.len() - 1, true);
+                }
+
+                e
+            })
+            .components(|c| {
+                c.create_action_row(|r| {
+                    r.create_button(|b| {
+                        b.emoji(ReactionType::Unicode("🔂".to_string()))
+                            .style(ButtonStyle::Danger)
+                            .custom_id("repeat")
+                    })
+                    .create_button(|b| {
+                        b.emoji(ReactionType::Unicode("⏸".to_string()))
+                            .style(ButtonStyle::Secondary)
+                            .custom_id("pause")
+                    })
+                    .create_button(|b| {
+                        b.emoji(ReactionType::Unicode("⏩".to_string()))
+                            .style(ButtonStyle::Secondary)
+                            .custom_id("skip")
+                    })
+                    .create_button(|b| {
+                        b.emoji(ReactionType::Unicode("⏹".to_string()))
+                            .style(ButtonStyle::Secondary)
+                            .custom_id("stop")
+                    })
+                })
+            })
+        })
+        .await;
+}
+
+/// Set the status message to its default idle state
+pub async fn set_idle(ctx: &Context) {
+    let mut message = get_status_message(ctx).await.unwrap();
+
+    let bot = ctx.cache.current_user();
+
+    let _ = message
+        .edit(&ctx.http, |m| {
+            m.embed(|e| {
+                e.color(EmbedColor::Success.hex())
+                    .title(&bot.name)
+                    .url("https://github.com/btoschek/lorelei")
+                    .description("Play your favorite songs right in Discord")
+                    .thumbnail(bot.face())
+                    .field("Play a song", "/play URL", false)
+            })
+            .components(|c| c)
+        })
+        .await;
 }
