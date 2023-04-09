@@ -5,6 +5,7 @@ pub mod command_leave;
 pub mod command_play;
 pub mod command_skip;
 mod status;
+mod events;
 
 pub mod command {
     pub use super::command_join as join;

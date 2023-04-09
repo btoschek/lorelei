@@ -1,4 +1,7 @@
+use std::time::Duration;
+
 use super::super::util::EmbedColor;
+use super::events::{TrackEndNotifier, TrackStartNotifier};
 use crate::{edit_interaction_response, interaction_response};
 
 use chrono::{NaiveDate, NaiveTime};
@@ -14,7 +17,7 @@ use serenity::{
     },
 };
 
-use songbird::input::restartable::Restartable;
+use songbird::{input::restartable::Restartable, TrackEvent};
 
 pub async fn run(
     ctx: &Context,
@@ -77,6 +80,23 @@ pub async fn run(
         };
 
         let track_handle = handler.enqueue_source(source.into());
+
+        let _ = track_handle.add_event(
+            songbird::Event::Delayed(Duration::new(0, 0)),
+            TrackStartNotifier {
+                ctx: ctx.clone(),
+                queue: handler.queue().to_owned(),
+                user_id: interaction.user.id,
+            },
+        );
+
+        let _ = track_handle.add_event(
+            songbird::Event::Track(TrackEvent::End),
+            TrackEndNotifier {
+                ctx: ctx.clone(),
+                queue: handler.queue().to_owned(),
+            },
+        );
 
         let meta = track_handle.metadata();
 
