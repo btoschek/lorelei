@@ -10,7 +10,7 @@ use std::env;
 
 use crate::modules::util::EmbedColor;
 
-const CHANNEL_NAME: &str = "🎵-lorelei-🎵";
+const CHANNEL_NAME: &str = "🔊lorelei";
 
 pub async fn ensure_channel_exists(ctx: &Context) {
     let guild_id = GuildId(env::var("TEST_GUILD").unwrap().parse().unwrap());
