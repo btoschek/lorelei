@@ -4,6 +4,7 @@ use serenity::{
     prelude::TypeMapKey,
 };
 
+mod actions;
 pub mod command_join;
 pub mod command_leave;
 pub mod command_play;
@@ -18,6 +19,9 @@ pub mod command {
     pub use super::command_skip as skip;
 }
 
+pub mod action {
+    pub use super::actions::current_track_set_repeat;
+}
 
 struct TrackRequesterId;
 

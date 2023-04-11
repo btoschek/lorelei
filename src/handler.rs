@@ -12,7 +12,7 @@ pub struct BotHandler;
 impl EventHandler for BotHandler {
     /// Handle any slash command interactions with a user
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
-        if let Interaction::ApplicationCommand(command) = interaction {
+        if let Interaction::ApplicationCommand(command) = interaction.clone() {
             let _ = match command.data.name.as_str() {
                 // "ping" => general::command::ping::run(&ctx, &command).await,
                 "join" => music::command::join::run(&ctx, &command, true).await,
@@ -21,7 +21,19 @@ impl EventHandler for BotHandler {
                 "skip" => music::command::skip::run(&ctx, &command, true).await,
                 _ => unreachable!("No further commands implemented"),
             };
-        };
+        }
+
+        if let Interaction::MessageComponent(component) = interaction {
+            let _ = match component.data.custom_id.as_str() {
+                "loop_on" | "loop_off" => {
+                    music::action::current_track_set_repeat(&ctx, &component).await
+                }
+                "pause" => todo!("Implement"),
+                "skip" => todo!("Implement"),
+                "stop" => todo!("Implement"),
+                _ => unreachable!("No further actions implemented"),
+            };
+        }
     }
 
     /// Signal to Discord the commands our bot exposes
