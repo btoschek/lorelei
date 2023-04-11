@@ -33,6 +33,8 @@ impl EventHandler for BotHandler {
                 "stop" => todo!("Implement"),
                 _ => unreachable!("No further actions implemented"),
             };
+
+            let _ = component.defer(ctx).await;
         }
     }
 
