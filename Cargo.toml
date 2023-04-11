@@ -28,9 +28,5 @@ features = [
 ]
 
 [dependencies.songbird]
-# version = "0.3"
+version = "0.3"
 features = [ "builtin-queue", "yt-dlp" ]
-
-# Temporary workaround mentioned in https://github.com/serenity-rs/songbird/issues/172#issuecomment-1500999525
-git = "https://github.com/Erk-/songbird/"
-branch = "do-not-fail-if-new-opcode"
