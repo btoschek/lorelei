@@ -100,6 +100,11 @@ pub async fn run(
             },
         );
 
+        let queue = handler.queue();
+        if queue.len() > 1 {
+            status::set_currently_playing(ctx, queue).await;
+        }
+
         let meta = track_handle.metadata();
 
         if react {
