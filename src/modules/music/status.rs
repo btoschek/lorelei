@@ -10,10 +10,12 @@ use serenity::{
         Permissions,
     },
 };
-use songbird::tracks::TrackQueue;
+use songbird::tracks::{LoopState, TrackQueue};
 use std::env;
 
 use crate::modules::util::EmbedColor;
+
+use super::TrackRequesterId;
 
 const CHANNEL_NAME: &str = "🔊lorelei";
 
@@ -96,15 +98,27 @@ pub async fn get_status_message(ctx: &Context) -> Option<Message> {
 pub async fn set_currently_playing(ctx: &Context, queue: &TrackQueue, user_id: UserId) {
     let mut message = get_status_message(ctx).await.unwrap();
 
-    let user = user_id.to_user(&ctx).await.expect("User has to exist");
     let current_track = queue.current();
-
     let current_track = match current_track {
         Some(track) => track,
         None => return,
     };
 
+    let requested_user = current_track.typemap().read().await;
+    let requested_user = requested_user.get::<TrackRequesterId>();
+    let user = requested_user
+        .unwrap()
+        .to_user(&ctx)
+        .await
+        .expect("User has to exist");
+
     let meta = current_track.metadata();
+    let state = current_track
+        .get_info()
+        .await
+        .expect("TrackState should exist");
+
+    let is_looping = !matches!(state.loops, LoopState::Finite(0));
 
     let _ = message
         .edit(&ctx.http, |m| {
@@ -113,7 +127,7 @@ pub async fn set_currently_playing(ctx: &Context, queue: &TrackQueue, user_id: U
                     .description(format!(
                         "[{}]({})",
                         meta.title.as_ref().unwrap_or(&"Untitled".to_string()),
-                        meta.source_url.as_ref().unwrap_or(&"Test".to_string())
+                        meta.source_url.as_ref().expect("We have to stream from something")
                     ))
                     .color(EmbedColor::Success.hex())
                     .thumbnail(
@@ -142,11 +156,13 @@ pub async fn set_currently_playing(ctx: &Context, queue: &TrackQueue, user_id: U
                     e.field("Uploaded", datetime.format("%d.%m.%Y"), true);
                 }
 
-                e.field(
-                    "Queued by",
-                    format!("{}#{}", user.name, user.discriminator),
-                    true,
-                );
+                if requested_user.is_some() {
+                    e.field(
+                        "Queued by",
+                        format!("{}#{}", user.name, user.discriminator),
+                        true,
+                    );
+                }
 
                 if queue.len() > 1 {
                     e.field("Pending songs", queue.len() - 1, true);
@@ -158,8 +174,12 @@ pub async fn set_currently_playing(ctx: &Context, queue: &TrackQueue, user_id: U
                 c.create_action_row(|r| {
                     r.create_button(|b| {
                         b.emoji(ReactionType::Unicode("🔂".to_string()))
-                            .style(ButtonStyle::Danger)
-                            .custom_id("repeat")
+                            .style(if is_looping {
+                                ButtonStyle::Success
+                            } else {
+                                ButtonStyle::Danger
+                            })
+                            .custom_id(if is_looping { "loop_off" } else { "loop_on" })
                     })
                     .create_button(|b| {
                         b.emoji(ReactionType::Unicode("⏸".to_string()))

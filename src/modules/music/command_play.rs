@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use super::super::util::EmbedColor;
 use super::events::{TrackEndNotifier, TrackStartNotifier};
+use crate::modules::music::{status, TrackRequesterId};
 use crate::{edit_interaction_response, interaction_response};
 
 use chrono::{NaiveDate, NaiveTime};
@@ -80,6 +81,8 @@ pub async fn run(
         };
 
         let track_handle = handler.enqueue_source(source.into());
+        let mut typemap = track_handle.typemap().write().await;
+        typemap.insert::<TrackRequesterId>(interaction.user.id);
 
         let _ = track_handle.add_event(
             songbird::Event::Delayed(Duration::new(0, 0)),
