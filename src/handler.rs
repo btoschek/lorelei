@@ -28,7 +28,9 @@ impl EventHandler for BotHandler {
                 "loop_on" | "loop_off" => {
                     music::action::current_track_set_repeat(&ctx, &component).await
                 }
-                "pause" => todo!("Implement"),
+                "pause" | "resume" => {
+                    music::action::current_track_set_playing(&ctx, &component).await
+                }
                 "skip" => todo!("Implement"),
                 "stop" => todo!("Implement"),
                 _ => unreachable!("No further actions implemented"),

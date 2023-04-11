@@ -10,7 +10,7 @@ use serenity::{
         Permissions,
     },
 };
-use songbird::tracks::{LoopState, TrackQueue};
+use songbird::tracks::{LoopState, PlayMode, TrackQueue};
 use std::env;
 
 use crate::modules::util::EmbedColor;
@@ -119,6 +119,7 @@ pub async fn set_currently_playing(ctx: &Context, queue: &TrackQueue) {
         .expect("TrackState should exist");
 
     let is_looping = !matches!(state.loops, LoopState::Finite(0));
+    let is_playing = matches!(state.playing, PlayMode::Play);
 
     let _ = message
         .edit(&ctx.http, |m| {
@@ -182,9 +183,9 @@ pub async fn set_currently_playing(ctx: &Context, queue: &TrackQueue) {
                             .custom_id(if is_looping { "loop_off" } else { "loop_on" })
                     })
                     .create_button(|b| {
-                        b.emoji(ReactionType::Unicode("⏸".to_string()))
+                        b.emoji(ReactionType::Unicode((if is_playing {"⏸"} else {"▶️"}).to_string()))
                             .style(ButtonStyle::Secondary)
-                            .custom_id("pause")
+                            .custom_id(if is_playing {"pause"} else {"resume"})
                     })
                     .create_button(|b| {
                         b.emoji(ReactionType::Unicode("⏩".to_string()))
