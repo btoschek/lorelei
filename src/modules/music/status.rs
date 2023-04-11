@@ -5,7 +5,7 @@ use serenity::{
         id::GuildId,
         prelude::{
             component::ButtonStyle, ChannelId, ChannelType, Message, PermissionOverwrite,
-            PermissionOverwriteType, ReactionType, RoleId, UserId,
+            PermissionOverwriteType, ReactionType, RoleId,
         },
         Permissions,
     },
@@ -95,7 +95,7 @@ pub async fn get_status_message(ctx: &Context) -> Option<Message> {
 }
 
 /// Set the status message to display information about the current track
-pub async fn set_currently_playing(ctx: &Context, queue: &TrackQueue, user_id: UserId) {
+pub async fn set_currently_playing(ctx: &Context, queue: &TrackQueue) {
     let mut message = get_status_message(ctx).await.unwrap();
 
     let current_track = queue.current();

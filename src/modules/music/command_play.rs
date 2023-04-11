@@ -89,7 +89,6 @@ pub async fn run(
             TrackStartNotifier {
                 ctx: ctx.clone(),
                 queue: handler.queue().to_owned(),
-                user_id: interaction.user.id,
             },
         );
 
