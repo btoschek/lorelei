@@ -22,6 +22,7 @@ pub mod command {
 pub mod action {
     pub use super::actions::current_track_set_playing;
     pub use super::actions::current_track_set_repeat;
+    pub use super::actions::current_track_skip;
 }
 
 struct TrackRequesterId;
