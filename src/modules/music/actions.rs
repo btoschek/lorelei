@@ -1,13 +1,32 @@
-use serenity::{
-    model::prelude::interaction::message_component::MessageComponentInteraction, prelude::Context,
-};
+use serenity::{model::prelude::GuildId, prelude::Context};
 
 use super::status;
 
-/// Toggle repeat status for the currently playing track
-pub async fn current_track_set_repeat(ctx: &Context, interaction: &MessageComponentInteraction) {
-    let guild_id = interaction.guild_id.expect("Can only be called in guilds");
+pub enum VoiceAction {
+    Play,
+    Pause,
+    LoopOn,
+    LoopOff,
+    Skip,
+    Stop,
+}
 
+impl VoiceAction {
+    pub fn from_str(action: &str) -> Option<Self> {
+        match action {
+            "play" => Some(Self::Play),
+            "pause" => Some(Self::Pause),
+            "loop_on" => Some(Self::LoopOn),
+            "loop_off" => Some(Self::LoopOff),
+            "skip" => Some(Self::Skip),
+            "stop" => Some(Self::Stop),
+            _ => None,
+        }
+    }
+}
+
+/// Interface with the underlying bot queue to manipulate the current track's state
+pub async fn perform_action(ctx: &Context, guild_id: GuildId, action: VoiceAction) {
     let manager = songbird::get(ctx)
         .await
         .expect("Songbird Voice client placed in at initialisation.");
@@ -19,64 +38,24 @@ pub async fn current_track_set_repeat(ctx: &Context, interaction: &MessageCompon
         let current = queue.current();
 
         if let Some(track) = current {
-            let success = match interaction.data.custom_id.as_str() {
-                "loop_on" => track.enable_loop(),
-                "loop_off" => track.disable_loop(),
-                _ => unreachable!("Further actions not supported"),
+            let force_update = match action {
+                VoiceAction::Play => track.play().is_ok(),
+                VoiceAction::Pause => track.pause().is_ok(),
+                VoiceAction::LoopOn => track.enable_loop().is_ok(),
+                VoiceAction::LoopOff => track.disable_loop().is_ok(),
+                VoiceAction::Skip => {
+                    let _ = queue.skip();
+                    false
+                }
+                VoiceAction::Stop => {
+                    queue.stop();
+                    false
+                }
             };
 
-            if success.is_ok() {
+            if force_update {
                 status::set_currently_playing(ctx, queue).await;
             }
         }
-    }
-}
-
-/// Start / stop playing the current track
-pub async fn current_track_set_playing(ctx: &Context, interaction: &MessageComponentInteraction) {
-    let guild_id = interaction.guild_id.expect("Can only be called in guilds");
-
-    let manager = songbird::get(ctx)
-        .await
-        .expect("Songbird Voice client placed in at initialisation.");
-
-    if let Some(handler_lock) = manager.get(guild_id) {
-        let handler = handler_lock.lock().await;
-
-        let queue = handler.queue();
-        let current = queue.current();
-
-        if let Some(track) = current {
-            let success = match interaction.data.custom_id.as_str() {
-                "pause" => track.pause(),
-                "resume" => track.play(),
-                _ => unreachable!("Further actions not supported"),
-            };
-
-            if success.is_ok() {
-                status::set_currently_playing(ctx, queue).await;
-            }
-        }
-    }
-}
-
-/// Finish the playback of the currently playing song, starting the next one in the queue
-pub async fn current_track_skip(ctx: &Context, interaction: &MessageComponentInteraction) {
-    let guild_id = interaction.guild_id.expect("Can only be called in guilds");
-
-    let manager = songbird::get(ctx)
-        .await
-        .expect("Songbird Voice client placed in at initialisation.");
-
-    if let Some(handler_lock) = manager.get(guild_id) {
-        let handler = handler_lock.lock().await;
-
-        let queue = handler.queue();
-        let _ = queue.skip();
-
-        // NOTE: We don't need to force an update here, because:
-        //   - A new song automatically updates the status
-        //   - If the skipped song were to be the last one,
-        //     it automatically sets the status on track end
     }
 }

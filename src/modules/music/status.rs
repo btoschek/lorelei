@@ -185,7 +185,7 @@ pub async fn set_currently_playing(ctx: &Context, queue: &TrackQueue) {
                     .create_button(|b| {
                         b.emoji(ReactionType::Unicode((if is_playing {"⏸"} else {"▶️"}).to_string()))
                             .style(ButtonStyle::Secondary)
-                            .custom_id(if is_playing {"pause"} else {"resume"})
+                            .custom_id(if is_playing {"pause"} else {"play"})
                     })
                     .create_button(|b| {
                         b.emoji(ReactionType::Unicode("⏩".to_string()))

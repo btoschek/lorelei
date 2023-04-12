@@ -1,4 +1,7 @@
-use crate::modules::{auto, general, music};
+use crate::modules::{
+    auto, general,
+    music::{self, VoiceAction},
+};
 use serenity::{
     async_trait,
     client::{Context, EventHandler},
@@ -24,19 +27,19 @@ impl EventHandler for BotHandler {
         }
 
         if let Interaction::MessageComponent(component) = interaction {
-            let _ = match component.data.custom_id.as_str() {
-                "loop_on" | "loop_off" => {
-                    music::action::current_track_set_repeat(&ctx, &component).await
-                }
-                "pause" | "resume" => {
-                    music::action::current_track_set_playing(&ctx, &component).await
-                }
-                "skip" => music::action::current_track_skip(&ctx, &component).await,
-                "stop" => todo!("Implement"),
-                _ => unreachable!("No further actions implemented"),
-            };
+            let guild_id = component
+                .guild_id
+                .expect("Interactions only available in guilds");
 
-            let _ = component.defer(ctx).await;
+            let action = VoiceAction::from_str(component.data.custom_id.as_str());
+
+            if let Some(a) = action {
+                music::perform_action(&ctx, guild_id, a).await;
+
+                // We have to defer the interaction here to notify Discord
+                // that we did handle the message
+                let _ = component.defer(ctx).await;
+            }
         }
     }
 
