@@ -169,6 +169,26 @@ pub async fn set_currently_playing(ctx: &Context, queue: &TrackQueue) {
                     e.field("Pending songs", queue.len() - 1, true);
                 }
 
+                let numbers = [":one:", ":two:", ":three:"];
+                let queue_tracks = queue.current_queue()
+                    .into_iter()
+                    .skip(1)
+                    .take(3)
+                    .enumerate()
+                    .map(|(i, t)| {
+                        let meta = t.metadata();
+                        format!(
+                            "{} [{}]({})",
+                            numbers[i],
+                            meta.title.as_ref().unwrap_or(&"Untitled".to_string()),
+                            meta.source_url.as_ref().unwrap()
+                        )
+                    })
+                    .collect::<Vec<String>>()
+                    .join("\n");
+
+                e.field("Upcoming songs", queue_tracks, false);
+
                 e
             })
             .components(|c| {
