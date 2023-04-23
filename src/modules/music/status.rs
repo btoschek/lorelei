@@ -13,7 +13,7 @@ use serenity::{
 use songbird::tracks::{LoopState, PlayMode, TrackQueue};
 use std::env;
 
-use crate::modules::util::EmbedColor;
+use crate::modules::util::{cap_string, EmbedColor};
 
 use super::TrackRequesterId;
 
@@ -173,10 +173,14 @@ pub async fn set_currently_playing(ctx: &Context, queue: &TrackQueue) {
                     .enumerate()
                     .map(|(i, t)| {
                         let meta = t.metadata();
+                        let title = meta.title.to_owned().unwrap_or("Untitled".to_string())
+                            .replace('[', "(")
+                            .replace(']', ")");
+
                         format!(
                             "{} [{}]({})",
                             numbers[i],
-                            meta.title.as_ref().unwrap_or(&"Untitled".to_string()),
+                            cap_string(&title, 50),
                             meta.source_url.as_ref().unwrap()
                         )
                     })

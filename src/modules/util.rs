@@ -45,3 +45,16 @@ macro_rules! edit_interaction_response {
             .await?
     };
 }
+
+/// Shortens the String provided to the specified length if necessary,
+/// succeeded by '...' if capped in the process
+pub fn cap_string(original: &str, length: usize) -> String {
+    let mut original: String = original.into();
+
+    if original.len() > length {
+        original.truncate(length - 4);
+        original += " ...";
+    }
+
+    original
+}
