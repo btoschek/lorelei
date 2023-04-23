@@ -165,10 +165,6 @@ pub async fn set_currently_playing(ctx: &Context, queue: &TrackQueue) {
                     );
                 }
 
-                if queue.len() > 1 {
-                    e.field("Pending songs", queue.len() - 1, true);
-                }
-
                 let numbers = [":one:", ":two:", ":three:"];
                 let queue_tracks = queue.current_queue()
                     .into_iter()
@@ -184,10 +180,11 @@ pub async fn set_currently_playing(ctx: &Context, queue: &TrackQueue) {
                             meta.source_url.as_ref().unwrap()
                         )
                     })
-                    .collect::<Vec<String>>();
+                    .collect::<Vec<String>>()
+                    .join("\n");
 
-                if !queue_tracks.is_empty() {
-                    e.field("Upcoming songs", queue_tracks.join("\n"), false);
+                if queue.len() > 1 {
+                    e.field("Upcoming songs", queue_tracks, false);
                 }
 
                 e
