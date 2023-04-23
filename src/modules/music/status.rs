@@ -184,10 +184,11 @@ pub async fn set_currently_playing(ctx: &Context, queue: &TrackQueue) {
                             meta.source_url.as_ref().unwrap()
                         )
                     })
-                    .collect::<Vec<String>>()
-                    .join("\n");
+                    .collect::<Vec<String>>();
 
-                e.field("Upcoming songs", queue_tracks, false);
+                if !queue_tracks.is_empty() {
+                    e.field("Upcoming songs", queue_tracks.join("\n"), false);
+                }
 
                 e
             })
