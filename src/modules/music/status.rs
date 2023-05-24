@@ -1,5 +1,6 @@
 use chrono::{NaiveDate, NaiveTime};
 use serenity::{
+    builder::CreateEmbed,
     client::Context,
     model::{
         id::GuildId,
@@ -97,22 +98,23 @@ pub async fn get_status_message(ctx: &Context) -> Option<Message> {
 /// Set the status message to display information about the current track
 pub async fn set_currently_playing(ctx: &Context, queue: &TrackQueue) {
     let mut message = get_status_message(ctx).await.unwrap();
+    let mut embed = CreateEmbed::default();
 
     let current_track = queue.current();
     let current_track = match current_track {
         Some(track) => track,
-        None => return,
+        None => {
+            populate_with_default_status(ctx, &mut embed);
+
+            message
+                .edit(&ctx.http, |m| m.set_embed(embed).components(|c| c))
+                .await
+                .ok();
+
+            return;
+        }
     };
 
-    let requested_user = current_track.typemap().read().await;
-    let requested_user = requested_user.get::<TrackRequesterId>();
-    let user = requested_user
-        .unwrap()
-        .to_user(&ctx)
-        .await
-        .expect("User has to exist");
-
-    let meta = current_track.metadata();
     let state = current_track
         .get_info()
         .await
@@ -121,79 +123,11 @@ pub async fn set_currently_playing(ctx: &Context, queue: &TrackQueue) {
     let is_looping = !matches!(state.loops, LoopState::Finite(0));
     let is_playing = matches!(state.playing, PlayMode::Play);
 
-    let _ = message
+    populate_with_status(ctx, queue, &mut embed).await;
+
+    message
         .edit(&ctx.http, |m| {
-            m.embed(|e| {
-                e.title("Listening to")
-                    .description(format!(
-                        "[{}]({})",
-                        meta.title.as_ref().unwrap_or(&"Untitled".to_string()),
-                        meta.source_url.as_ref().expect("We have to stream from something")
-                    ))
-                    .color(EmbedColor::Success.hex())
-                    .thumbnail(
-                        meta.thumbnail.as_ref().unwrap_or(
-                            &"https://ak.picdn.net/shutterstock/videos/34370329/thumb/1.jpg"
-                                .to_string(),
-                        ),
-                    );
-
-                if let Some(artist) = &meta.artist.as_ref() {
-                    e.footer(|f| f.text(artist));
-                }
-
-                if let Some(duration) = &meta.duration.as_ref() {
-                    let time = NaiveTime::from_num_seconds_from_midnight_opt(
-                        duration.as_secs() as u32,
-                        0,
-                    )
-                    .expect("Just crash if someone is trolling with lengths exceeding the heat death of the universe");
-                    e.field("Duration", time.format("%H:%M:%S"), true);
-                }
-
-                if let Some(date) = &meta.date.as_ref() {
-                    let datetime = NaiveDate::parse_from_str(date, "%Y%m%d")
-                        .expect("This format theoretically should not change");
-                    e.field("Uploaded", datetime.format("%d.%m.%Y"), true);
-                }
-
-                if requested_user.is_some() {
-                    e.field(
-                        "Queued by",
-                        format!("{}#{}", user.name, user.discriminator),
-                        true,
-                    );
-                }
-
-                let numbers = [":one:", ":two:", ":three:"];
-                let queue_tracks = queue.current_queue()
-                    .into_iter()
-                    .skip(1)
-                    .take(3)
-                    .enumerate()
-                    .map(|(i, t)| {
-                        let meta = t.metadata();
-                        let title = meta.title.to_owned().unwrap_or("Untitled".to_string())
-                            .replace('[', "(")
-                            .replace(']', ")");
-
-                        format!(
-                            "{} [{}]({})",
-                            numbers[i],
-                            cap_string(&title, 50),
-                            meta.source_url.as_ref().unwrap()
-                        )
-                    })
-                    .collect::<Vec<String>>()
-                    .join("\n");
-
-                if queue.len() > 1 {
-                    e.field("Upcoming songs", queue_tracks, false);
-                }
-
-                e
-            })
-            .components(|c| {
+            m.set_embed(embed).components(|c| {
                 c.create_action_row(|r| {
                     r.create_button(|b| {
                         b.emoji(ReactionType::Unicode("🔂".to_string()))
@@ -205,9 +139,15 @@ pub async fn set_currently_playing(ctx: &Context, queue: &TrackQueue) {
                             .custom_id(if is_looping { "loop_off" } else { "loop_on" })
                     })
                     .create_button(|b| {
-                        b.emoji(ReactionType::Unicode((if is_playing {"⏸"} else {"▶️"}).to_string()))
-                            .style(ButtonStyle::Secondary)
-                            .custom_id(if is_playing {"pause"} else {"play"})
+                        b.emoji(ReactionType::Unicode(
+                            (if is_playing { "⏸" } else { "▶️" }).to_string(),
+                        ))
+                        .style(ButtonStyle::Secondary)
+                        .custom_id(if is_playing {
+                            "pause"
+                        } else {
+                            "play"
+                        })
                     })
                     .create_button(|b| {
                         b.emoji(ReactionType::Unicode("⏩".to_string()))
@@ -222,26 +162,99 @@ pub async fn set_currently_playing(ctx: &Context, queue: &TrackQueue) {
                 })
             })
         })
-        .await;
+        .await
+        .ok();
 }
 
 /// Set the status message to its default idle state
 pub async fn set_idle(ctx: &Context) {
     let mut message = get_status_message(ctx).await.unwrap();
 
-    let bot = ctx.cache.current_user();
+    let mut embed = CreateEmbed::default();
+    populate_with_default_status(ctx, &mut embed);
 
     let _ = message
-        .edit(&ctx.http, |m| {
-            m.embed(|e| {
-                e.color(EmbedColor::Success.hex())
-                    .title(&bot.name)
-                    .url("https://github.com/btoschek/lorelei")
-                    .description("Play your favorite songs right in Discord")
-                    .thumbnail(bot.face())
-                    .field("Play a song", "/play URL", false)
-            })
-            .components(|c| c)
-        })
+        .edit(&ctx.http, |m| m.set_embed(embed).components(|c| c))
         .await;
+}
+
+/// Populate the provided `CreateEmbed` with the default message to be
+/// displayed when no activity is performed
+fn populate_with_default_status<'a>(
+    ctx: &Context,
+    embed: &'a mut CreateEmbed,
+) -> &'a mut CreateEmbed {
+    let bot = ctx.cache.current_user();
+
+    embed
+        .color(EmbedColor::Success.hex())
+        .title(&bot.name)
+        .url("https://github.com/btoschek/lorelei")
+        .description("Play your favorite songs right in Discord")
+        .thumbnail(bot.face())
+        .field("Play a song", "/play URL", false)
+}
+
+/// Populate the provided `CreateEmbed` with the current status of
+/// the bot ready to be displayed to the end-user
+pub async fn populate_with_status<'a>(
+    ctx: &Context,
+    queue: &TrackQueue,
+    embed: &'a mut CreateEmbed,
+) -> &'a mut CreateEmbed {
+    let current_track = queue.current();
+    let current_track = match current_track {
+        Some(track) => track,
+        None => return populate_with_default_status(ctx, embed),
+    };
+
+    let meta = current_track.metadata();
+
+    embed
+        .title("Listening to")
+        .description(format!(
+            "[{}]({})",
+            meta.title.as_ref().unwrap_or(&"Untitled".to_string()),
+            meta.source_url
+                .as_ref()
+                .expect("We have to stream from something")
+        ))
+        .color(EmbedColor::Success.hex())
+        .thumbnail(meta.thumbnail.as_ref().unwrap_or(
+            &"https://ak.picdn.net/shutterstock/videos/34370329/thumb/1.jpg".to_string(),
+        ));
+
+    if let Some(artist) = &meta.artist.as_ref() {
+        embed.footer(|f| f.text(artist));
+    }
+
+    if let Some(duration) = &meta.duration.as_ref() {
+        let time = NaiveTime::from_num_seconds_from_midnight_opt(duration.as_secs() as u32, 0)
+            .expect("Just crash if someone is trolling with lengths exceeding the heat death of the universe");
+
+        embed.field("Duration", time.format("%H:%M:%S"), true);
+    }
+
+    if let Some(date) = &meta.date.as_ref() {
+        let datetime = NaiveDate::parse_from_str(date, "%Y%m%d")
+            .expect("Date format theoretically should not change");
+
+        embed.field("Uploaded", datetime.format("%d.%m.%Y"), true);
+    }
+
+    let user = current_track.typemap().read().await;
+    let user = user.get::<TrackRequesterId>();
+    let user = user
+        .unwrap()
+        .to_user(&ctx)
+        .await
+        .expect("User has to exist");
+
+    embed.field(
+        "Queued by",
+        format!("{}#{}", user.name, user.discriminator),
+        true,
+    );
+
+    embed
 }
