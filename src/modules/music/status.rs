@@ -48,19 +48,12 @@ pub async fn ensure_channel_exists(ctx: &Context) {
             })
             .await;
 
-        let bot = ctx.cache.current_user();
+        let mut embed = CreateEmbed::default();
+        populate_with_idle_status(ctx, &mut embed);
+
         let _ = channel_handle
             .unwrap()
-            .send_message(&ctx.http, |m| {
-                m.embed(|e| {
-                    e.color(EmbedColor::Success.hex())
-                        .title(&bot.name)
-                        .url("https://github.com/btoschek/lorelei")
-                        .description("Play your favorite songs right in Discord")
-                        .thumbnail(bot.face())
-                        .field("Play a song", "/play URL", false)
-                })
-            })
+            .send_message(&ctx.http, |m| m.set_embed(embed))
             .await;
     }
 }
@@ -104,7 +97,7 @@ pub async fn update_status(ctx: &Context, queue: &TrackQueue) {
     let current_track = match current_track {
         Some(track) => track,
         None => {
-            populate_with_default_status(ctx, &mut embed);
+            populate_with_idle_status(ctx, &mut embed);
 
             message
                 .edit(&ctx.http, |m| m.set_embed(embed).components(|c| c))
@@ -169,10 +162,7 @@ pub async fn update_status(ctx: &Context, queue: &TrackQueue) {
 
 /// Populate the provided `CreateEmbed` with the default message to be
 /// displayed when no activity is performed
-fn populate_with_default_status<'a>(
-    ctx: &Context,
-    embed: &'a mut CreateEmbed,
-) -> &'a mut CreateEmbed {
+fn populate_with_idle_status<'a>(ctx: &Context, embed: &'a mut CreateEmbed) -> &'a mut CreateEmbed {
     let bot = ctx.cache.current_user();
 
     embed
@@ -194,7 +184,7 @@ async fn populate_with_status<'a>(
     let current_track = queue.current();
     let current_track = match current_track {
         Some(track) => track,
-        None => return populate_with_default_status(ctx, embed),
+        None => return populate_with_idle_status(ctx, embed),
     };
 
     let meta = current_track.metadata();
