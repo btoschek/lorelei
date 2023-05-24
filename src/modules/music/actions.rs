@@ -54,7 +54,7 @@ pub async fn perform_action(ctx: &Context, guild_id: GuildId, action: VoiceActio
             };
 
             if force_update {
-                status::set_currently_playing(ctx, queue).await;
+                status::update_status(ctx, queue).await;
             }
         }
     }

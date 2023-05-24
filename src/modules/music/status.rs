@@ -96,7 +96,7 @@ pub async fn get_status_message(ctx: &Context) -> Option<Message> {
 }
 
 /// Set the status message to display information about the current track
-pub async fn set_currently_playing(ctx: &Context, queue: &TrackQueue) {
+pub async fn update_status(ctx: &Context, queue: &TrackQueue) {
     let mut message = get_status_message(ctx).await.unwrap();
     let mut embed = CreateEmbed::default();
 
@@ -166,17 +166,6 @@ pub async fn set_currently_playing(ctx: &Context, queue: &TrackQueue) {
         .ok();
 }
 
-/// Set the status message to its default idle state
-pub async fn set_idle(ctx: &Context) {
-    let mut message = get_status_message(ctx).await.unwrap();
-
-    let mut embed = CreateEmbed::default();
-    populate_with_default_status(ctx, &mut embed);
-
-    let _ = message
-        .edit(&ctx.http, |m| m.set_embed(embed).components(|c| c))
-        .await;
-}
 
 /// Populate the provided `CreateEmbed` with the default message to be
 /// displayed when no activity is performed
@@ -197,7 +186,7 @@ fn populate_with_default_status<'a>(
 
 /// Populate the provided `CreateEmbed` with the current status of
 /// the bot ready to be displayed to the end-user
-pub async fn populate_with_status<'a>(
+async fn populate_with_status<'a>(
     ctx: &Context,
     queue: &TrackQueue,
     embed: &'a mut CreateEmbed,

@@ -12,7 +12,7 @@ pub struct TrackEndNotifier {
 impl VoiceEventHandler for TrackEndNotifier {
     async fn act(&self, _ctx: &EventContext<'_>) -> Option<Event> {
         if self.queue.is_empty() {
-            status::set_idle(&self.ctx).await;
+            status::update_status(&self.ctx, &self.queue).await;
         }
         None
     }
@@ -26,7 +26,7 @@ pub struct TrackStartNotifier {
 #[async_trait]
 impl VoiceEventHandler for TrackStartNotifier {
     async fn act(&self, _ctx: &EventContext<'_>) -> Option<Event> {
-        status::set_currently_playing(&self.ctx, &self.queue).await;
+        status::update_status(&self.ctx, &self.queue).await;
         None
     }
 }
