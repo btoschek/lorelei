@@ -48,13 +48,24 @@ pub async fn ensure_channel_exists(ctx: &Context) {
             })
             .await;
 
-        let mut embed = CreateEmbed::default();
-        populate_with_idle_status(ctx, &mut embed);
+        let mut status_embed = CreateEmbed::default();
+        populate_with_idle_status(ctx, &mut status_embed);
 
-        let _ = channel_handle
+        channel_handle
+            .as_ref()
             .unwrap()
-            .send_message(&ctx.http, |m| m.set_embed(embed))
-            .await;
+            .send_message(&ctx.http, |m| m.set_embed(status_embed))
+            .await
+            .ok();
+
+        let mut queue_embed = CreateEmbed::default();
+        populate_with_idle_queue(&mut queue_embed);
+
+        channel_handle
+            .unwrap()
+            .send_message(&ctx.http, |m| m.set_embed(queue_embed))
+            .await
+            .ok();
     }
 }
 
@@ -74,33 +85,48 @@ async fn get_status_channel(ctx: &Context) -> Option<ChannelId> {
 
 /// Get a handle to the message used to convey bot information
 pub async fn get_status_message(ctx: &Context) -> Option<Message> {
-    let channel = get_status_channel(ctx).await?;
+    let channel_id = get_status_channel(ctx).await?;
+    let message_id = env::var("STATUS_MESSAGE")
+        .expect("Temporary value required for development")
+        .parse::<u64>()
+        .unwrap();
 
-    let messages = channel
-        .messages(&ctx.http, |retriever| retriever.limit(1))
+    ctx.http
+        .get_message(channel_id.into(), message_id)
         .await
-        .ok()?;
+        .ok()
+}
 
-    if messages.is_empty() {
-        None
-    } else {
-        Some(messages.get(0).unwrap().to_owned())
-    }
+/// Get a handle to the message used to convey queue information
+pub async fn get_queue_message(ctx: &Context) -> Option<Message> {
+    let channel_id = get_status_channel(ctx).await?;
+    let message_id = env::var("QUEUE_MESSAGE")
+        .expect("Temporary value required for development")
+        .parse::<u64>()
+        .unwrap();
+
+    ctx.http
+        .get_message(channel_id.into(), message_id)
+        .await
+        .ok()
 }
 
 /// Set the status message to display information about the current track
 pub async fn update_status(ctx: &Context, queue: &TrackQueue) {
-    let mut message = get_status_message(ctx).await.unwrap();
-    let mut embed = CreateEmbed::default();
+    let mut status_message = get_status_message(ctx).await.unwrap();
+    let mut status_embed = CreateEmbed::default();
+
+    let mut queue_message = get_queue_message(ctx).await.unwrap();
+    let mut queue_embed = CreateEmbed::default();
 
     let current_track = queue.current();
     let current_track = match current_track {
         Some(track) => track,
         None => {
-            populate_with_idle_status(ctx, &mut embed);
+            populate_with_idle_status(ctx, &mut status_embed);
 
-            message
-                .edit(&ctx.http, |m| m.set_embed(embed).components(|c| c))
+            status_message
+                .edit(&ctx.http, |m| m.set_embed(status_embed).components(|c| c))
                 .await
                 .ok();
 
@@ -116,11 +142,12 @@ pub async fn update_status(ctx: &Context, queue: &TrackQueue) {
     let is_looping = !matches!(state.loops, LoopState::Finite(0));
     let is_playing = matches!(state.playing, PlayMode::Play);
 
-    populate_with_current_status(ctx, queue, &mut embed).await;
+    populate_with_current_status(ctx, queue, &mut status_embed).await;
+    populate_with_current_queue(queue, &mut queue_embed);
 
-    message
+    status_message
         .edit(&ctx.http, |m| {
-            m.set_embed(embed).components(|c| {
+            m.set_embed(status_embed).components(|c| {
                 c.create_action_row(|r| {
                     r.create_button(|b| {
                         b.emoji(ReactionType::Unicode("🔂".to_string()))
@@ -157,8 +184,12 @@ pub async fn update_status(ctx: &Context, queue: &TrackQueue) {
         })
         .await
         .ok();
-}
 
+    queue_message
+        .edit(&ctx.http, |m| m.set_embed(queue_embed))
+        .await
+        .ok();
+}
 
 /// Populate the provided `CreateEmbed` with the default message to be
 /// displayed when no activity is performed
@@ -175,7 +206,7 @@ fn populate_with_idle_status<'a>(ctx: &Context, embed: &'a mut CreateEmbed) -> &
 }
 
 /// Populate the provided `CreateEmbed` with the current status of
-/// the bot ready to be displayed to the end-user
+/// the bot, ready to be displayed to the end-user
 async fn populate_with_current_status<'a>(
     ctx: &Context,
     queue: &TrackQueue,
@@ -233,7 +264,69 @@ async fn populate_with_current_status<'a>(
         "Queued by",
         format!("{}#{}", user.name, user.discriminator),
         true,
-    );
+    )
+}
+
+/// Populate the provided `CreateEmbed` with the default message to be
+/// displayed when no tracks are queued (either only one track is playing or none)
+fn populate_with_idle_queue(embed: &mut CreateEmbed) -> &mut CreateEmbed {
+    embed
+        .title("Upcoming tracks")
+        .color(EmbedColor::Success.hex())
+        .description("There are currently no tracks queued.")
+}
+
+/// Populate the provided `CreateEmbed` with information about the
+/// current audio queue of the bot, ready to be displayed to the end-user
+fn populate_with_current_queue<'a>(
+    queue: &TrackQueue,
+    embed: &'a mut CreateEmbed,
+) -> &'a mut CreateEmbed {
+    let numbers = [":one:", ":two:", ":three:", ":four:", ":five:"];
+    let queue = queue.current_queue();
+
+    if queue.len() <= 1 {
+        return populate_with_idle_queue(embed);
+    }
+
+    // Format the next n items into a markdown string following the scheme:
+    //   :one: [<Track title>](<Track URL>)
+    //   :two: [<Track title>](<Track URL>)
+    let mut embed_description = queue
+        .iter()
+        .skip(1)
+        .take(numbers.len())
+        .enumerate()
+        .map(|(i, t)| {
+            let meta = t.metadata();
+            let title = meta
+                .title
+                .to_owned()
+                .unwrap_or("Untitled".to_string())
+                .replace('[', "(")
+                .replace(']', ")");
+
+            format!(
+                "{} [{}]({})",
+                numbers[i],
+                cap_string(&title, 50),
+                meta.source_url.as_ref().unwrap()
+            )
+        })
+        .collect::<Vec<String>>()
+        .join("\n");
+
+    // Calculate the amount of tracks not being displayed
+    let num_tracks_not_displayed = queue.len() as i64 - (numbers.len() as i64 + 1);
+
+    // If some tracks can't be displayed, append a counter
+    // with the amount of tracks not being shown
+    if num_tracks_not_displayed > 0 {
+        embed_description.push_str(&format!("\n\nand {} more", num_tracks_not_displayed));
+    }
 
     embed
+        .title("Upcoming tracks")
+        .description(embed_description)
+        .color(EmbedColor::Success.hex())
 }
