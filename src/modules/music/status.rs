@@ -116,7 +116,7 @@ pub async fn update_status(ctx: &Context, queue: &TrackQueue) {
     let is_looping = !matches!(state.loops, LoopState::Finite(0));
     let is_playing = matches!(state.playing, PlayMode::Play);
 
-    populate_with_status(ctx, queue, &mut embed).await;
+    populate_with_current_status(ctx, queue, &mut embed).await;
 
     message
         .edit(&ctx.http, |m| {
@@ -176,7 +176,7 @@ fn populate_with_idle_status<'a>(ctx: &Context, embed: &'a mut CreateEmbed) -> &
 
 /// Populate the provided `CreateEmbed` with the current status of
 /// the bot ready to be displayed to the end-user
-async fn populate_with_status<'a>(
+async fn populate_with_current_status<'a>(
     ctx: &Context,
     queue: &TrackQueue,
     embed: &'a mut CreateEmbed,
