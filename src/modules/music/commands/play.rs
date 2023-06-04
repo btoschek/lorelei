@@ -1,8 +1,8 @@
 use std::time::Duration;
 
-use super::super::util::EmbedColor;
-use super::events::{TrackEndNotifier, TrackStartNotifier};
+use super::super::events::{TrackEndNotifier, TrackStartNotifier};
 use crate::modules::music::{status, TrackRequesterId};
+use crate::modules::util::EmbedColor;
 use crate::{edit_interaction_response, interaction_response};
 
 use chrono::{NaiveDate, NaiveTime};
@@ -26,7 +26,7 @@ pub async fn run(
     react: bool,
 ) -> CommandResult {
     // Ensure bot is in the voice channel
-    let _ = super::command::join::run(ctx, interaction, false).await;
+    let _ = super::join::run(ctx, interaction, false).await;
 
     let url = interaction
         .data

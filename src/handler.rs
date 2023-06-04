@@ -18,10 +18,10 @@ impl EventHandler for BotHandler {
         if let Interaction::ApplicationCommand(command) = interaction.clone() {
             let _ = match command.data.name.as_str() {
                 // "ping" => general::command::ping::run(&ctx, &command).await,
-                "join" => music::command::join::run(&ctx, &command, true).await,
-                "leave" => music::command::leave::run(&ctx, &command, true).await,
-                "play" => music::command::play::run(&ctx, &command, true).await,
-                "skip" => music::command::skip::run(&ctx, &command, true).await,
+                "join" => music::commands::join::run(&ctx, &command, true).await,
+                "leave" => music::commands::leave::run(&ctx, &command, true).await,
+                "play" => music::commands::play::run(&ctx, &command, true).await,
+                "skip" => music::commands::skip::run(&ctx, &command, true).await,
                 _ => unreachable!("No further commands implemented"),
             };
         }
@@ -53,7 +53,7 @@ impl EventHandler for BotHandler {
         );
 
         general::register_commands(&ctx).await;
-        music::register_commands(&ctx).await;
+        music::init(&ctx).await;
     }
 
     /// Trigger automated voice-chat related functionalities
