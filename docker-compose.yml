@@ -1,0 +1,11 @@
+version: '3.8'
+services:
+  lorelei:
+    environment:
+      BOT_TOKEN: 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+      TEST_GUILD: 'xxxxxxxxxxxxxxxxxx'
+      STATUS_MESSAGE: 'xxxxxxxxxxxxxxxxxxx'
+      QUEUE_MESSAGE: 'xxxxxxxxxxxxxxxxxxx'
+    build:
+      context: .
+      dockerfile: Dockerfile
