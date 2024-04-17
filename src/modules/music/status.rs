@@ -262,7 +262,11 @@ async fn populate_with_current_status<'a>(
 
     embed.field(
         "Queued by",
-        format!("{}#{}", user.name, user.discriminator),
+        if user.discriminator != 0 {
+            format!("{}#{}", user.name, user.discriminator)
+        } else {
+            user.name
+        },
         true,
     )
 }
