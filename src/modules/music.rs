@@ -6,6 +6,7 @@ pub use actions::VoiceAction;
 
 pub mod commands;
 mod events;
+mod providers;
 mod status;
 
 struct TrackRequesterId;

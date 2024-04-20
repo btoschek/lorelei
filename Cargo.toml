@@ -10,6 +10,8 @@ tracing-subscriber = "0.2"
 tracing-futures = "0.2"
 dotenv = "0.15.0"
 chrono = "0.4.24"
+serde = "1.0.198"
+serde_json = "1.0.116"
 
 # Async functionality
 [dependencies.tokio]

@@ -1,11 +1,11 @@
 use std::time::Duration;
 
 use super::super::events::{TrackEndNotifier, TrackStartNotifier};
-use crate::modules::music::{status, TrackRequesterId};
+use crate::modules::music::{providers::ytdlp::YtDlp, status, TrackRequesterId};
 use crate::modules::util::EmbedColor;
 use crate::{edit_interaction_response, interaction_response};
 
-use chrono::{NaiveDate, NaiveTime};
+use serenity::model::id::UserId;
 use serenity::{
     builder::CreateApplicationCommand,
     client::Context,
@@ -17,8 +17,10 @@ use serenity::{
         },
     },
 };
+use songbird::Call;
+use tokio::sync::MutexGuard;
 
-use songbird::{input::restartable::Restartable, TrackEvent};
+use songbird::TrackEvent;
 
 pub async fn run(
     ctx: &Context,
@@ -26,22 +28,23 @@ pub async fn run(
     react: bool,
 ) -> CommandResult {
     // Ensure bot is in the voice channel
+    // FIXME: This was super bodged to begin with, don't ever do this shit, refactor asap
     let _ = super::join::run(ctx, interaction, false).await;
 
     let url = interaction
         .data
         .options
-        .get(0)
+        .first()
         .expect("Expected URL string")
         .resolved
         .as_ref()
         .expect("Valid UTF-8 String expected");
 
-    let url = match url {
-        CommandDataOptionValue::String(u) => u,
-        _ => unreachable!("Non-string value in string parameter"),
+    let CommandDataOptionValue::String(url) = url else {
+        unreachable!("Non-string value in String parameter")
     };
 
+    // TODO: Use search instead
     if !url.starts_with("http") {
         return Ok(interaction_response!(interaction, ctx, |d| {
             d.ephemeral(true).embed(|e| {
@@ -51,102 +54,111 @@ pub async fn run(
         }));
     }
 
-    let guild_id = interaction.guild_id.unwrap();
+    let guild_id = interaction
+        .guild_id
+        .expect("GuildId has to be set in Guilds");
     let manager = songbird::get(ctx)
         .await
         .expect("Songbird Voice client placed in at initialisation.")
         .clone();
 
-    if let Some(handler_lock) = manager.get(guild_id) {
-        let mut handler = handler_lock.lock().await;
-
+    // Return early if no Call (voice connection manager) exists for the current guild
+    // Tip: If no Call exists, you should make sure to let the bot join a voice channel before trying again
+    // TODO: This could be expected here, due to forcing the bot to join a voice channel above
+    let call = manager.get(guild_id);
+    if call.is_none() {
         interaction_response!(interaction, ctx, |d| {
             d.ephemeral(true).embed(|e| {
-                e.title("Searching ...")
-                    .url(url)
-                    .color(EmbedColor::Pending.hex())
+                e.title("Not in a voice channel")
+                    .description("Please connect the bot to a voice channel first")
+                    .color(EmbedColor::Failure.hex())
             })
         });
-
-        // Use lazy restartable sources to not pay
-        // for decoding of tracks which aren't actually live yet
-        let source = match Restartable::ytdl(url.clone(), true).await {
-            Ok(source) => source,
-            Err(_why) => {
-                edit_interaction_response!(interaction, ctx, |d| {
-                    d.embed(|e| e.title("Source not found").color(EmbedColor::Failure.hex()))
-                });
-                return Ok(());
-            }
-        };
-
-        let track_handle = handler.enqueue_source(source.into());
-        let mut typemap = track_handle.typemap().write().await;
-        typemap.insert::<TrackRequesterId>(interaction.user.id);
-
-        let _ = track_handle.add_event(
-            songbird::Event::Delayed(Duration::new(0, 0)),
-            TrackStartNotifier {
-                ctx: ctx.clone(),
-                queue: handler.queue().to_owned(),
-            },
-        );
-
-        let _ = track_handle.add_event(
-            songbird::Event::Track(TrackEvent::End),
-            TrackEndNotifier {
-                ctx: ctx.clone(),
-                queue: handler.queue().to_owned(),
-            },
-        );
-
-        let queue = handler.queue();
-        if queue.len() > 1 {
-            status::update_status(ctx, queue).await;
-        }
-
-        let meta = track_handle.metadata();
-
-        if react {
-            edit_interaction_response!(interaction, ctx, |d| {
-                d.embed(|e| {
-                    e.title(meta.title.as_ref().unwrap_or(&"No title".to_string()))
-                        .url(meta.source_url.as_ref().unwrap())
-                        .color(EmbedColor::Success.hex())
-                        .thumbnail(
-                            meta.thumbnail.as_ref().unwrap_or(
-                                &"https://ak.picdn.net/shutterstock/videos/34370329/thumb/1.jpg"
-                                    .to_string(),
-                            ),
-                        );
-
-                    if let Some(artist) = &meta.artist.as_ref() {
-                        e.footer(|a| a.text(artist));
-                    }
-
-                    if let Some(duration) = &meta.duration.as_ref() {
-                        let time = NaiveTime::from_num_seconds_from_midnight_opt(
-                            duration.as_secs() as u32,
-                            0,
-                        )
-                        .expect("Just crash if someone is trolling with lengths exceeding the heat death of the universe");
-                        e.field("Duration", time.format("%H:%M:%S"), true);
-                    }
-
-                    if let Some(date) = &meta.date.as_ref() {
-                        let datetime = NaiveDate::parse_from_str(date, "%Y%m%d").expect("This format theoretically should not change");
-                        e.field("Uploaded", datetime.format("%d.%m.%Y"), true);
-                    }
-
-                    e
-                })
-            });
-        }
-    } else {
-        //log_msg_err(msg.channel_id.say(&ctx.http, "Not in a voice channel to play in").await);
+        return Err("Not in a voice channel to play audio in".into());
     }
 
+    let handler_lock = call.expect("call.is_none() already checked above");
+    let mut handler = handler_lock.lock().await;
+
+    interaction_response!(interaction, ctx, |d| {
+        d.ephemeral(true).embed(|e| {
+            e.title("Searching ...")
+                .url(url)
+                .color(EmbedColor::Pending.hex())
+        })
+    });
+
+    let urls_to_queue: Vec<String> = {
+        if url.contains("/playlist?list=") {
+            YtDlp::playlist(url.clone())
+                .into_iter()
+                .map(|v| v.url)
+                .collect()
+        } else {
+            vec![url.to_string()]
+        }
+    };
+
+    edit_interaction_response!(interaction, ctx, |d| {
+        d.embed(|e| {
+            e.title(format!(
+                "Adding {} songs to the queue ...",
+                urls_to_queue.len()
+            ))
+            .url(url)
+            .color(EmbedColor::Pending.hex())
+        })
+    });
+
+    // Actually queue tracks here
+    for url in urls_to_queue {
+        enqueue_track(ctx, url, &mut handler, interaction.user.id).await;
+    }
+
+    let queue = handler.queue();
+    if queue.len() > 1 {
+        status::update_status(ctx, queue).await;
+    }
+
+    // Respond to the user with a confirmation message
+    edit_interaction_response!(interaction, ctx, |d| {
+        d.embed(|e| {
+            e.title("Added all songs to the queue")
+                .color(EmbedColor::Success.hex())
+        })
+    });
+
     Ok(())
+}
+
+async fn enqueue_track(
+    ctx: &Context,
+    url: String,
+    handler: &mut MutexGuard<'_, Call>,
+    user_id: UserId,
+) {
+    // TODO: Don't unwrap here, propagate error upwards
+    let source = YtDlp::url(url).await.unwrap();
+
+    let track_handle = handler.enqueue_source(source.into());
+    let mut typemap = track_handle.typemap().write().await;
+    typemap.insert::<TrackRequesterId>(user_id);
+
+    let _ = track_handle.add_event(
+        songbird::Event::Delayed(Duration::new(0, 0)),
+        TrackStartNotifier {
+            ctx: ctx.clone(),
+            queue: handler.queue().to_owned(),
+        },
+    );
+
+    let _ = track_handle.add_event(
+        songbird::Event::Track(TrackEvent::End),
+        TrackEndNotifier {
+            ctx: ctx.clone(),
+            queue: handler.queue().to_owned(),
+        },
+    );
 }
 
 pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
