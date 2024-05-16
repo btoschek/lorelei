@@ -29,7 +29,7 @@ RUN cargo build --release --target x86_64-unknown-linux-gnu
 
 FROM debian:bullseye-slim
 
-RUN apt-get update && apt-get install python3-pip -y
+RUN apt-get update && apt-get install python3-pip ffmpeg -y
 RUN pip install -U yt-dlp
 
 COPY --from=builder /etc/passwd /etc/passwd
