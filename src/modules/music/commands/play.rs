@@ -144,6 +144,9 @@ async fn enqueue_track(
     let mut typemap = track_handle.typemap().write().await;
     typemap.insert::<TrackRequesterId>(user_id);
 
+    // Set volume to an acceptable level at 100% Discord volume slider
+    let _ = track_handle.set_volume(0.02);
+
     let _ = track_handle.add_event(
         songbird::Event::Delayed(Duration::new(0, 0)),
         TrackStartNotifier {
